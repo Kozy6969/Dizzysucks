@@ -1415,7 +1415,7 @@ function OpenCore:CreateWindow(config)
 
                     local currentColor = sectionConfig.Default
                     local currentTransparency = 0
-                    local hue, saturation, value = 0, 1, 1
+                    local hue, saturation, value = RGBtoHSV(currentColor.R * 255, currentColor.G * 255, currentColor.B * 255)
 
                     local function createColorPickerTooltip()
                         local tooltip = Instance.new("Frame")
@@ -1464,7 +1464,7 @@ function OpenCore:CreateWindow(config)
                         local brightnessFill = Instance.new("Frame")
                         brightnessFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                         brightnessFill.BorderSizePixel = 0
-                        brightnessFill.Size = UDim2.new(1, 0, 1, 0)
+                        brightnessFill.Size = UDim2.new(value, 0, 1, 0)
                         brightnessFill.Parent = brightnessSlider
                         AddCorner(brightnessFill, 3)
 
@@ -1499,7 +1499,7 @@ function OpenCore:CreateWindow(config)
                         local transparencyFill = Instance.new("Frame")
                         transparencyFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
                         transparencyFill.BorderSizePixel = 0
-                        transparencyFill.Size = UDim2.new(1, 0, 1, 0)
+                        transparencyFill.Size = UDim2.new(currentTransparency, 0, 1, 0)
                         transparencyFill.Parent = transparencySlider
                         AddCorner(transparencyFill, 3)
 
