@@ -544,7 +544,8 @@ function OpenCore:CreateWindow(config)
 		subtitle.TextColor3 = Theme.SubText
 		subtitle.TextSize = 12
 		subtitle.Position = UDim2.new(0, 15, 0, 28)
-		subtitle.Size = UDim2.new(1, -30, 0, 18)
+		subtitle.Size = UDim2.new(1, -30, 0, 0)
+		subtitle.AutomaticSize = Enum.AutomaticSize.Y
 		subtitle.TextWrapped = true
 		subtitle.TextXAlignment = Enum.TextXAlignment.Left
 		subtitle.TextYAlignment = Enum.TextYAlignment.Top
@@ -899,7 +900,6 @@ function OpenCore:CreateWindow(config)
 					paragraphConfig = paragraphConfig or {}
 					paragraphConfig.Title = paragraphConfig.Title or "Paragraph"
 					paragraphConfig.Content = paragraphConfig.Content or "No content"
-
 					local paragraphFrame = Instance.new("Frame")
 					paragraphFrame.BackgroundColor3 = Theme.Surface
 					paragraphFrame.BorderSizePixel = 0
@@ -917,14 +917,21 @@ function OpenCore:CreateWindow(config)
 					paragraphPadding.PaddingBottom = UDim.new(0, 12)
 					paragraphPadding.Parent = paragraphFrame
 
+					local paragraphLayout = Instance.new("UIListLayout")
+					paragraphLayout.SortOrder = Enum.SortOrder.LayoutOrder
+					paragraphLayout.Padding = UDim.new(0, 6)
+					paragraphLayout.Parent = paragraphFrame
+
 					local paragraphTitle = Instance.new("TextLabel")
 					paragraphTitle.BackgroundTransparency = 1
 					paragraphTitle.Font = GetFont(Window.Font, "Bold")
 					paragraphTitle.Text = paragraphConfig.Title
 					paragraphTitle.TextColor3 = Theme.Text
 					paragraphTitle.TextSize = 13
-					paragraphTitle.Size = UDim2.new(1, 0, 0, 18)
+					paragraphTitle.Size = UDim2.new(1, 0, 0, 0)
+					paragraphTitle.AutomaticSize = Enum.AutomaticSize.Y
 					paragraphTitle.TextXAlignment = Enum.TextXAlignment.Left
+					paragraphTitle.TextWrapped = true
 					paragraphTitle.Parent = paragraphFrame
 
 					local paragraphText = Instance.new("TextLabel")
@@ -933,13 +940,20 @@ function OpenCore:CreateWindow(config)
 					paragraphText.Text = paragraphConfig.Content
 					paragraphText.TextColor3 = Theme.SubText
 					paragraphText.TextSize = 12
-					paragraphText.Position = UDim2.new(0, 0, 0, 22)
-					paragraphText.Size = UDim2.new(1, 0, 0, 0)
-					paragraphText.AutomaticSize = Enum.AutomaticSize.Y
+					paragraphText.Size = UDim2.new(1, 0, 0, 20)
 					paragraphText.TextWrapped = true
 					paragraphText.TextXAlignment = Enum.TextXAlignment.Left
 					paragraphText.TextYAlignment = Enum.TextYAlignment.Top
 					paragraphText.Parent = paragraphFrame
+
+					-- Expand size until text fits
+					task.spawn(function()
+						task.wait(0.05)
+						while not paragraphText.TextFits do
+							paragraphText.Size = UDim2.new(1, 0, 0, paragraphText.Size.Y.Offset + 5)
+							task.wait(0.01)
+						end
+					end)
 
 					return {
 						SetTitle = function(self, text)
@@ -947,6 +961,14 @@ function OpenCore:CreateWindow(config)
 						end,
 						SetContent = function(self, text)
 							paragraphText.Text = text
+							paragraphText.Size = UDim2.new(1, 0, 0, 20)
+							task.spawn(function()
+								task.wait(0.05)
+								while not paragraphText.TextFits do
+									paragraphText.Size = UDim2.new(1, 0, 0, paragraphText.Size.Y.Offset + 5)
+									task.wait(0.01)
+								end
+							end)
 						end
 					}
 				end
