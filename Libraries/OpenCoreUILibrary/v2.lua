@@ -544,8 +544,10 @@ function OpenCore:CreateWindow(config)
 		subtitle.TextColor3 = Theme.SubText
 		subtitle.TextSize = 12
 		subtitle.Position = UDim2.new(0, 15, 0, 28)
-		subtitle.Size = UDim2.new(0, 300, 0, 18)
+		subtitle.Size = UDim2.new(1, -30, 0, 18)
+		subtitle.TextWrapped = true
 		subtitle.TextXAlignment = Enum.TextXAlignment.Left
+		subtitle.TextYAlignment = Enum.TextYAlignment.Top
 		subtitle.Parent = topBar
 
 		-- Close
