@@ -3,8 +3,6 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
-local Mouse = Players.LocalPlayer:GetMouse()
-
 -- Try CoreGui first then playergui
 local function GetGuiParent()
 	local success, result = pcall(function()
@@ -2309,7 +2307,7 @@ function OpenCore:AddColorWheel(sectionConfig)
 	colorFrame.BackgroundColor3 = Theme.Surface
 	colorFrame.BorderSizePixel = 0
 	colorFrame.Size = UDim2.new(1, 0, 0, 35)
-	colorFrame.ClipsDescendants = true
+	colorFrame.ClipsDescendants = false
 	colorFrame.Parent = elements
 
 	AddCorner(colorFrame, 4)
@@ -2346,9 +2344,24 @@ function OpenCore:AddColorWheel(sectionConfig)
 		tooltip.BackgroundColor3 = Theme.Card
 		tooltip.BorderSizePixel = 0
 		tooltip.Size = UDim2.new(0, 250, 0, 300)
-		tooltip.Position = UDim2.new(0.5, -125, 0, 50)
-		tooltip.Parent = colorFrame
+		tooltip.Parent = colorFrame.Parent.Parent
 		AddCorner(tooltip, 6)
+		
+		-- Position tooltip below the color frame, centered
+		local function updateTooltipPosition()
+			local colorFrameAbsPos = colorFrame.AbsolutePosition
+			local colorFrameAbsSize = colorFrame.AbsoluteSize
+			local tooltipWidth = 250
+			local tooltipHeight = 300
+			
+			-- Position below the color frame, centered horizontally
+			local xPos = colorFrameAbsPos.X + (colorFrameAbsSize.X / 2) - (tooltipWidth / 2)
+			local yPos = colorFrameAbsPos.Y + colorFrameAbsSize.Y + 5
+			
+			tooltip.Position = UDim2.new(0, xPos, 0, yPos)
+		end
+		
+		updateTooltipPosition()
 
 		-- Color wheel
 		local wheelCanvas = Instance.new("ImageLabel")
@@ -2532,10 +2545,11 @@ function OpenCore:AddColorWheel(sectionConfig)
 	end
 
 	colorPreview.MouseButton1Click:Connect(function()
-		if colorFrame:FindFirstChild("ColorPickerTooltip") then
-			colorFrame:FindFirstChild("ColorPickerTooltip"):Destroy()
+		if colorFrame.Parent:FindFirstChild("ColorPickerTooltip") then
+			colorFrame.Parent:FindFirstChild("ColorPickerTooltip"):Destroy()
 		else
-			createColorPickerTooltip()
+			local tooltip = createColorPickerTooltip()
+			tooltip.Name = "ColorPickerTooltip"
 		end
 	end)
 
