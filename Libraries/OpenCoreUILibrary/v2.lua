@@ -3,6 +3,13 @@ local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
+-- Wait for LocalPlayer to exist
+local LocalPlayer = Players.LocalPlayer
+while not LocalPlayer do
+	LocalPlayer = Players.LocalPlayer
+	task.wait()
+end
+
 -- Try CoreGui first then playergui
 local function GetGuiParent()
 	local success, result = pcall(function()
@@ -21,7 +28,7 @@ local function GetGuiParent()
 		end
 	end
 
-	return Players.LocalPlayer:WaitForChild("PlayerGui")
+	return LocalPlayer:WaitForChild("PlayerGui")
 end
 
 -- Icons
