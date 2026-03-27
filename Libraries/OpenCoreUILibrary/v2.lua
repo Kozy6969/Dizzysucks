@@ -311,8 +311,7 @@ local function CreateKeySystem(config, callback, theme)
 	InputBox.PlaceholderColor3 = theme.Muted
 	InputBox.Text = ""
 	InputBox.TextColor3 = theme.Text
-	InputBox.TextSize = 14
-	InputBox.TextScaled = true
+	InputBox.TextSize = 16
 	InputBox.TextXAlignment = Enum.TextXAlignment.Left
 	InputBox.ClearTextOnFocus = false
 	InputBox.Parent = InputFrame
@@ -2301,8 +2300,7 @@ function OpenCore:CreateWindow(config)
 					textBox.PlaceholderColor3 = Theme.Muted
 					textBox.Text = inputConfig.Default
 					textBox.TextColor3 = Theme.Text
-					textBox.TextSize = 12
-					textBox.TextScaled = true
+					textBox.TextSize = 14
 					textBox.TextXAlignment = Enum.TextXAlignment.Left
 					textBox.ClearTextOnFocus = false
 					textBox.Parent = inputFrame
@@ -2322,6 +2320,8 @@ function OpenCore:CreateWindow(config)
 						task.spawn(function()
 							pcall(inputConfig.Callback, textBox.Text)
 						end)
+							repeat
+								textBox.Text = "" wait() until textBox.Text == ""
 							end
 					end)
 
