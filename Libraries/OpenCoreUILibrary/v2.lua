@@ -2302,6 +2302,7 @@ function OpenCore:CreateWindow(config)
 					textBox.Text = inputConfig.Default
 					textBox.TextColor3 = Theme.Text
 					textBox.TextSize = 12
+					textBox.TextScaled = true
 					textBox.TextXAlignment = Enum.TextXAlignment.Left
 					textBox.ClearTextOnFocus = false
 					textBox.Parent = inputFrame
@@ -2329,9 +2330,11 @@ function OpenCore:CreateWindow(config)
 							textBox.Text = value
 							if inputConfig.Flag then
 								OpenCore.Flags[inputConfig.Flag] = value
-								textBox.Text = ""
+								repeat
+								textBox.Text = "" wait() until textBox.Text == ""
 							else
-								textBox.Text = ""
+								repeat
+								textBox.Text = "" wait() until textBox.Text == ""
 							end
 						end
 					}
