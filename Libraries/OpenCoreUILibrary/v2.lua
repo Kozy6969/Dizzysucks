@@ -2313,13 +2313,15 @@ function OpenCore:CreateWindow(config)
 					textPadding.PaddingRight = UDim.new(0, 8)
 					textPadding.Parent = textBox
 
-					textBox.FocusLost:Connect(function()
+					textBox.FocusLost:Connect(function(enterPressed)
+							if enterPressed then
 						if inputConfig.Flag then
 							OpenCore.Flags[inputConfig.Flag] = textBox.Text
 						end
 						task.spawn(function()
 							pcall(inputConfig.Callback, textBox.Text)
 						end)
+							end
 					end)
 
 					return {
