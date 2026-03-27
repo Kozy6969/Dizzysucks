@@ -312,6 +312,7 @@ local function CreateKeySystem(config, callback, theme)
 	InputBox.Text = ""
 	InputBox.TextColor3 = theme.Text
 	InputBox.TextSize = 14
+	InputBox.TextScaled = true
 	InputBox.TextXAlignment = Enum.TextXAlignment.Left
 	InputBox.ClearTextOnFocus = false
 	InputBox.Parent = InputFrame
@@ -375,6 +376,7 @@ local function CreateKeySystem(config, callback, theme)
 		Button.Text = text
 		Button.TextColor3 = theme.Text
 		Button.TextSize = 13
+		Button.TextScaled = true
 		Button.AutoButtonColor = false
 		Button.Parent = ButtonContainer
 
@@ -2325,6 +2327,9 @@ function OpenCore:CreateWindow(config)
 							textBox.Text = value
 							if inputConfig.Flag then
 								OpenCore.Flags[inputConfig.Flag] = value
+								textBox.Text = ""
+							else
+								textBox.Text = ""
 							end
 						end
 					}
