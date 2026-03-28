@@ -1438,264 +1438,356 @@ function OpenCore:CreateWindow(config)
 				end
 
 				-- Multi-Select Dropdown
-				function Section:AddMultiDropdown(multiConfig)
-					multiConfig = multiConfig or {}
-					multiConfig.Name = multiConfig.Name or "Multi-Select"
-					multiConfig.Options = multiConfig.Options or {}
-					multiConfig.Default = multiConfig.Default or {}
-					multiConfig.MaxSelected = multiConfig.MaxSelected or nil
-					multiConfig.MinSelected = multiConfig.MinSelected or 1
-					multiConfig.Flag = multiConfig.Flag or nil
-					multiConfig.Callback = multiConfig.Callback or function() end
+function Section:AddMultiDropdown(multi_config)
+	multi_config = multi_config or {}
+	multi_config.Name = multi_config.Name or "Multi-Select"
+	multi_config.Options = multi_config.Options or {}
+	multi_config.Default = multi_config.Default or {}
+	multi_config.MaxSelected = multi_config.MaxSelected or nil
+	multi_config.MinSelected = multi_config.MinSelected or 1
+	multi_config.Flag = multi_config.Flag or nil
+	multi_config.Callback = multi_config.Callback or function() end
 
-					local selected = {}
-					for _, item in ipairs(multiConfig.Default) do
-						table.insert(selected, item)
+	local theme = OpenCore.Themes[OpenCore.CurrentTheme] or {}
+	theme.Primary  = theme.Primary  or Color3.fromRGB(0, 170, 255)
+	theme.Danger   = theme.Danger   or Color3.fromRGB(255, 50, 50)
+	theme.Success  = theme.Success  or Color3.fromRGB(0, 255, 0)
+	theme.Card     = theme.Card     or Color3.fromRGB(50, 50, 50)
+	theme.Surface  = theme.Surface  or Color3.fromRGB(30, 30, 30)
+	theme.Border   = theme.Border   or Color3.fromRGB(60, 60, 60)
+	theme.Hover    = theme.Hover    or theme.Card
+	theme.Text     = theme.Text     or Color3.fromRGB(255, 255, 255)
+	theme.SubText  = theme.SubText  or Color3.fromRGB(180, 180, 180)
+
+	local selected_indices = {}
+	for _, item in ipairs(multi_config.Default) do
+		for i, opt in ipairs(multi_config.Options) do
+			if opt == item then
+				selected_indices[i] = true
+				break
+			end
+		end
+	end
+	local opened = false
+
+	local drop_frame = Instance.new("Frame")
+	drop_frame.BackgroundColor3 = theme.Surface
+	drop_frame.BorderSizePixel = 0
+	drop_frame.Size = UDim2.new(1, 0, 0, 35)
+	drop_frame.ClipsDescendants = true
+	drop_frame.Parent = elements
+	AddCorner(drop_frame, 4)
+	AddStroke(drop_frame, theme.Border, 1, 0)
+
+	local header = Instance.new("TextButton")
+	header.BackgroundTransparency = 1
+	header.Size = UDim2.new(1, 0, 0, 35)
+	header.Text = ""
+	header.Parent = drop_frame
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Font = GetFont(Window.Font, "Medium")
+	label.Text = multi_config.Name
+	label.TextColor3 = theme.Text
+	label.TextSize = 13
+	label.Position = UDim2.new(0, 12, 0, 0)
+	label.Size = UDim2.new(0.4, 0, 1, 0)
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = header
+
+	local value_label = Instance.new("TextLabel")
+	value_label.BackgroundTransparency = 1
+	value_label.Font = GetFont(Window.Font, "Regular")
+	value_label.TextColor3 = theme.SubText
+	value_label.TextSize = 12
+	value_label.Position = UDim2.new(0.4, 0, 0, 0)
+	value_label.Size = UDim2.new(0.6, -35, 1, 0)
+	value_label.TextXAlignment = Enum.TextXAlignment.Right
+	value_label.TextTruncate = Enum.TextTruncate.AtEnd
+	value_label.Parent = header
+
+	local arrow = Instance.new("ImageLabel")
+	arrow.BackgroundTransparency = 1
+	arrow.Image = Icons.ChevronDown
+	arrow.ImageColor3 = theme.SubText
+	arrow.AnchorPoint = Vector2.new(1, 0.5)
+	arrow.Position = UDim2.new(1, -12, 0.5, 0)
+	arrow.Size = UDim2.new(0, 14, 0, 14)
+	arrow.Parent = header
+
+	local options_container = Instance.new("Frame")
+	options_container.BackgroundColor3 = theme.Card
+	options_container.BorderSizePixel = 0
+	options_container.Position = UDim2.new(0, 1, 0, 36)
+	options_container.Size = UDim2.new(1, -2, 0, 0)
+	options_container.Parent = drop_frame
+
+	local options_list = Instance.new("UIListLayout")
+	options_list.SortOrder = Enum.SortOrder.LayoutOrder
+	options_list.Padding = UDim.new(0, 0)
+	options_list.Parent = options_container
+
+	local function update_value_label()
+		local names = {}
+		for i, _ in pairs(selected_indices) do
+			table.insert(names, multi_config.Options[i])
+		end
+		value_label.Text = #names > 0 and table.concat(names, ", ") or "None"
+	end
+	update_value_label()
+
+	local function is_selected_index(idx)
+		return selected_indices[idx] == true
+	end
+
+	local function selected_count()
+		local n = 0
+		for _ in pairs(selected_indices) do n = n + 1 end
+		return n
+	end
+
+	local function get_selected_names()
+		local names = {}
+		for i, _ in pairs(selected_indices) do
+			table.insert(names, multi_config.Options[i])
+		end
+		return names
+	end
+
+	local option_buttons = {}
+
+	local function update_dropdown_size()
+		if not opened then return end
+		Tween(drop_frame, {Size = UDim2.new(1, 0, 0, 36 + options_list.AbsoluteContentSize.Y)}, 0.2)
+	end
+
+	local function refresh_options(filtered_pairs)
+		for _, btn in pairs(option_buttons) do
+			if btn and btn.Parent then
+				btn:Destroy()
+			end
+		end
+		option_buttons = {}
+
+		for order, pair in ipairs(filtered_pairs) do
+			local real_index = pair.index
+			local option_name = pair.name
+
+			local option = Instance.new("TextButton")
+			option.BackgroundColor3 = theme.Card
+			option.BorderSizePixel = 0
+			option.Size = UDim2.new(1, 0, 0, 30)
+			option.Font = GetFont(Window.Font, "Regular")
+			option.Text = "  " .. option_name
+			option.TextColor3 = theme.SubText
+			option.TextSize = 12
+			option.TextXAlignment = Enum.TextXAlignment.Left
+			option.LayoutOrder = order + 3  
+			option.Parent = options_container
+
+			local circle = Instance.new("Frame")
+			circle.BackgroundColor3 = theme.Success
+			circle.BorderSizePixel = 0
+			circle.AnchorPoint = Vector2.new(1, 0.5)
+			circle.Position = UDim2.new(1, -12, 0.5, 0)
+			circle.Size = UDim2.new(0, 8, 0, 8)
+			circle.BackgroundTransparency = is_selected_index(real_index) and 0 or 1
+			circle.Parent = option
+			AddCorner(circle, 4)
+
+			option.MouseButton1Click:Connect(function()
+				if is_selected_index(real_index) then
+					if selected_count() > multi_config.MinSelected then
+						selected_indices[real_index] = nil
+						Tween(circle, {BackgroundTransparency = 1}, 0.2)
 					end
-					local opened = false
-
-					local dropFrame = Instance.new("Frame")
-					dropFrame.BackgroundColor3 = Theme.Surface
-					dropFrame.BorderSizePixel = 0
-					dropFrame.Size = UDim2.new(1, 0, 0, 35)
-					dropFrame.ClipsDescendants = true
-					dropFrame.Parent = elements
-
-					AddCorner(dropFrame, 4)
-					AddStroke(dropFrame, Theme.Border, 1, 0)
-
-					local header = Instance.new("TextButton")
-					header.BackgroundTransparency = 1
-					header.Size = UDim2.new(1, 0, 0, 35)
-					header.Text = ""
-					header.Parent = dropFrame
-
-					local label = Instance.new("TextLabel")
-					label.BackgroundTransparency = 1
-					label.Font = GetFont(Window.Font, "Medium")
-					label.Text = multiConfig.Name
-					label.TextColor3 = Theme.Text
-					label.TextSize = 13
-					label.Position = UDim2.new(0, 12, 0, 0)
-					label.Size = UDim2.new(0.4, 0, 1, 0)
-					label.TextXAlignment = Enum.TextXAlignment.Left
-					label.Parent = header
-
-					local valueLabel = Instance.new("TextLabel")
-					valueLabel.BackgroundTransparency = 1
-					valueLabel.Font = GetFont(Window.Font, "Regular")
-					valueLabel.Text = #selected > 0 and table.concat(selected, ", ") or "None"
-					valueLabel.TextColor3 = Theme.SubText
-					valueLabel.TextSize = 12
-					valueLabel.Position = UDim2.new(0.4, 0, 0, 0)
-					valueLabel.Size = UDim2.new(0.6, -35, 1, 0)
-					valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-					valueLabel.TextTruncate = Enum.TextTruncate.AtEnd
-					valueLabel.Parent = header
-
-					local arrow = Instance.new("ImageLabel")
-					arrow.BackgroundTransparency = 1
-					arrow.Image = Icons.ChevronDown
-					arrow.ImageColor3 = Theme.SubText
-					arrow.AnchorPoint = Vector2.new(1, 0.5)
-					arrow.Position = UDim2.new(1, -12, 0.5, 0)
-					arrow.Size = UDim2.new(0, 14, 0, 14)
-					arrow.Parent = header
-
-					local optionsContainer = Instance.new("Frame")
-					optionsContainer.BackgroundColor3 = Theme.Card
-					optionsContainer.BorderSizePixel = 0
-					optionsContainer.Position = UDim2.new(0, 1, 0, 36)
-					optionsContainer.Size = UDim2.new(1, -2, 0, 0)
-					optionsContainer.Parent = dropFrame
-
-					local optionsList = Instance.new("UIListLayout")
-					optionsList.SortOrder = Enum.SortOrder.LayoutOrder
-					optionsList.Padding = UDim.new(0, 0)
-					optionsList.Parent = optionsContainer
-
-					local function updateValueLabel()
-						valueLabel.Text = #selected > 0 and table.concat(selected, ", ") or "None"
+				else
+					if not multi_config.MaxSelected or selected_count() < multi_config.MaxSelected then
+						selected_indices[real_index] = true
+						Tween(circle, {BackgroundTransparency = 0}, 0.2)
 					end
-
-					local function isSelected(optionName)
-						for _, item in ipairs(selected) do
-							if item == optionName then
-								return true
-							end
-						end
-						return false
-					end
-
-					local function createOption(optionName)
-						local option = Instance.new("TextButton")
-						option.BackgroundColor3 = Theme.Card
-						option.BorderSizePixel = 0
-						option.Size = UDim2.new(1, 0, 0, 30)
-						option.Font = GetFont(Window.Font, "Regular")
-						option.Text = "  " .. optionName
-						option.TextColor3 = Theme.SubText
-						option.TextSize = 12
-						option.TextXAlignment = Enum.TextXAlignment.Left
-						option.Parent = optionsContainer
-
-						-- Circle indicator
-						local circle = Instance.new("Frame")
-						circle.BackgroundColor3 = Theme.Success
-						circle.BorderSizePixel = 0
-						circle.AnchorPoint = Vector2.new(1, 0.5)
-						circle.Position = UDim2.new(1, -12, 0.5, 0)
-						circle.Size = UDim2.new(0, 8, 0, 8)
-						circle.BackgroundTransparency = isSelected(optionName) and 0 or 1
-						circle.Parent = option
-						AddCorner(circle, 4)
-
-						option.MouseEnter:Connect(function()
-							Tween(option, {BackgroundColor3 = Theme.Hover}, 0.1)
-						end)
-
-						option.MouseLeave:Connect(function()
-							Tween(option, {BackgroundColor3 = Theme.Card}, 0.1)
-						end)
-
-						option.MouseButton1Click:Connect(function()
-							if isSelected(optionName) then
-								-- Remove if already selected (respecting MinSelected)
-								if #selected > multiConfig.MinSelected then
-									for i, item in ipairs(selected) do
-										if item == optionName then
-											table.remove(selected, i)
-											break
-										end
-									end
-									Tween(circle, {BackgroundTransparency = 1}, 0.2)
-								end
-							else
-								-- Add if not selected (respecting MaxSelected)
-								if not multiConfig.MaxSelected or #selected < multiConfig.MaxSelected then
-									table.insert(selected, optionName)
-									Tween(circle, {BackgroundTransparency = 0}, 0.2)
-								end
-							end
-
-							updateValueLabel()
-							if multiConfig.Flag then
-								OpenCore.Flags[multiConfig.Flag] = selected
-							end
-
-							task.spawn(function()
-								pcall(multiConfig.Callback, selected)
-							end)
-						end)
-
-						return option
-					end
-
-					for _, option in ipairs(multiConfig.Options) do
-						createOption(option)
-					end
-
-					local function updateDropdownSize()
-						if opened then
-							local optionCount = 0
-							for _, child in ipairs(optionsContainer:GetChildren()) do
-								if child:IsA("TextButton") then
-									optionCount = optionCount + 1
-								end
-							end
-							local targetSize = UDim2.new(1, 0, 0, 36 + optionCount * 30)
-							Tween(dropFrame, {Size = targetSize}, 0.2)
-						end
-					end
-
-					header.MouseButton1Click:Connect(function()
-						opened = not opened
-						local optionCount = 0
-						for _, child in ipairs(optionsContainer:GetChildren()) do
-							if child:IsA("TextButton") then
-								optionCount = optionCount + 1
-							end
-						end
-
-						if opened then
-							Tween(dropFrame, {Size = UDim2.new(1, 0, 0, 36 + optionCount * 30)}, 0.2)
-						else
-							Tween(dropFrame, {Size = UDim2.new(1, 0, 0, 35)}, 0.2)
-						end
-
-						Tween(arrow, {Rotation = opened and 180 or 0}, 0.2)
-						task.wait(0.2)
-						updateSectionSize()
-					end)
-
-					return {
-						Set = function(self, values)
-							selected = {}
-							for _, item in ipairs(values) do
-								table.insert(selected, item)
-							end
-							updateValueLabel()
-							-- Update circle transparency
-							for _, child in ipairs(optionsContainer:GetChildren()) do
-								if child:IsA("TextButton") then
-									local optionName = child.Text:sub(3)
-									local circle = child:FindFirstChildOfClass("Frame")
-									if circle then
-										Tween(circle, {BackgroundTransparency = isSelected(optionName) and 0 or 1}, 0.2)
-									end
-								end
-							end
-							if multiConfig.Flag then
-								OpenCore.Flags[multiConfig.Flag] = selected
-							end
-						end,
-						Get = function(self)
-							return selected
-						end,
-						AddOption = function(self, optionName)
-							table.insert(multiConfig.Options, optionName)
-							createOption(optionName)
-							updateDropdownSize()
-						end,
-						RemoveOption = function(self, optionName)
-							for i, v in ipairs(multiConfig.Options) do
-								if v == optionName then
-									table.remove(multiConfig.Options, i)
-									break
-								end
-							end
-							for _, child in pairs(optionsContainer:GetChildren()) do
-								if child:IsA("TextButton") and child.Text == "  " .. optionName then
-									child:Destroy()
-									break
-								end
-							end
-							updateDropdownSize()
-						end,
-						Clear = function(self)
-							multiConfig.Options = {}
-							for _, child in pairs(optionsContainer:GetChildren()) do
-								if child:IsA("TextButton") then
-									child:Destroy()
-								end
-							end
-							selected = {}
-							updateValueLabel()
-							updateDropdownSize()
-						end,
-						Refresh = function(self, options)
-							for _, child in ipairs(optionsContainer:GetChildren()) do
-								if child:IsA("TextButton") then
-									child:Destroy()
-								end
-							end
-							multiConfig.Options = options
-							for _, option in ipairs(options) do
-								createOption(option)
-							end
-						end
-					}
 				end
+				update_value_label()
+			end)
+
+			option_buttons[real_index] = option
+		end
+	end
+
+	local function build_pairs(options, filter_text)
+		local result = {}
+		filter_text = filter_text and filter_text:lower() or ""
+		for i, name in ipairs(options) do
+			if name:lower():find(filter_text, 1, true) then
+				table.insert(result, {index = i, name = name})
+			end
+		end
+		return result
+	end
+
+	local search_box = Instance.new("TextBox")
+	search_box.BackgroundColor3 = theme.Surface
+	search_box.BorderSizePixel = 0
+	search_box.Size = UDim2.new(1, -4, 0, 28)
+	search_box.Position = UDim2.new(0, 2, 0, 0)
+	search_box.PlaceholderText = "Search..."
+	search_box.Font = GetFont(Window.Font, "Regular")
+	search_box.TextSize = 14
+	search_box.TextColor3 = theme.Text
+	search_box.TextXAlignment = Enum.TextXAlignment.Left
+	search_box.ClearTextOnFocus = false
+	search_box.Text = ""
+	search_box.LayoutOrder = 1
+	search_box.Parent = options_container
+	AddCorner(search_box, 4)
+
+	local confirm_button = Instance.new("TextButton")
+	confirm_button.BackgroundColor3 = Color3.new(0,1,0)
+	confirm_button.BorderSizePixel = 0
+	confirm_button.Size = UDim2.new(1, 0, 0, 30)
+	confirm_button.Font = GetFont(Window.Font, "Medium")
+	confirm_button.Text = "Confirm"
+	confirm_button.TextColor3 = Color3.new(1, 1, 1)
+	confirm_button.TextSize = 13
+	confirm_button.TextScaled = true
+	confirm_button.LayoutOrder = 2  -- below search
+	confirm_button.Parent = options_container
+	AddCorner(confirm_button, 4)
+
+	local clear_button = Instance.new("TextButton")
+	clear_button.BackgroundColor3 = theme.Danger
+	clear_button.BorderSizePixel = 0
+	clear_button.Size = UDim2.new(1, 0, 0, 30)
+	clear_button.Font = GetFont(Window.Font, "Medium")
+	clear_button.Text = "Clear"
+	clear_button.TextColor3 = Color3.new(1, 1, 1)
+	clear_button.TextSize = 13
+	clear_button.TextScaled = true
+	clear_button.LayoutOrder = 3  -- below confirm
+	clear_button.Parent = options_container
+	AddCorner(clear_button, 4)
+
+	options_list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		options_container.Size = UDim2.new(1, -2, 0, options_list.AbsoluteContentSize.Y)
+		if opened then
+			Tween(drop_frame, {Size = UDim2.new(1, 0, 0, 36 + options_list.AbsoluteContentSize.Y)}, 0.2)
+			task.wait(0.2)
+			updateSectionSize()
+		end
+	end)
+
+	refresh_options(build_pairs(multi_config.Options))
+
+	task.wait(0.05)
+
+	search_box:GetPropertyChangedSignal("Text"):Connect(function()
+		refresh_options(build_pairs(multi_config.Options, search_box.Text))
+		update_dropdown_size()
+	end)
+
+	header.MouseButton1Click:Connect(function()
+		opened = not opened
+		if opened then
+			update_dropdown_size()
+		else
+			Tween(drop_frame, {Size = UDim2.new(1, 0, 0, 35)}, 0.2)
+		end
+		Tween(arrow, {Rotation = opened and 180 or 0}, 0.2)
+		task.wait(0.2)
+		updateSectionSize()
+	end)
+
+	confirm_button.MouseButton1Click:Connect(function()
+		local names = get_selected_names()
+		if multi_config.Flag then
+			OpenCore.Flags[multi_config.Flag] = names
+		end
+		task.spawn(function()
+			pcall(multi_config.Callback, names)
+		end)
+		opened = false
+		Tween(drop_frame, {Size = UDim2.new(1, 0, 0, 35)}, 0.2)
+		Tween(arrow, {Rotation = 0}, 0.2)
+		task.wait(0.2)
+		updateSectionSize()
+	end)
+
+	clear_button.MouseButton1Click:Connect(function()
+		selected_indices = {}
+		for _, item in ipairs(multi_config.Default) do
+			for i, opt in ipairs(multi_config.Options) do
+				if opt == item then
+					selected_indices[i] = true
+					break
+				end
+			end
+		end
+		update_value_label()
+		if multi_config.Flag then
+			OpenCore.Flags[multi_config.Flag] = get_selected_names()
+		end
+		refresh_options(build_pairs(multi_config.Options, search_box.Text))
+		update_dropdown_size()
+	end)
+
+	return {
+		Set = function(self, values)
+			selected_indices = {}
+			for _, item in ipairs(values) do
+				for i, opt in ipairs(multi_config.Options) do
+					if opt == item then
+						selected_indices[i] = true
+						break
+					end
+				end
+			end
+			update_value_label()
+			refresh_options(build_pairs(multi_config.Options, search_box.Text))
+		end,
+		Get = function(self)
+			return get_selected_names()
+		end,
+		AddOption = function(self, option_name)
+			table.insert(multi_config.Options, option_name)
+			refresh_options(build_pairs(multi_config.Options, search_box.Text))
+			update_dropdown_size()
+		end,
+		RemoveOption = function(self, option_name)
+			for i, v in ipairs(multi_config.Options) do
+				if v == option_name then
+					selected_indices[i] = nil
+					table.remove(multi_config.Options, i)
+					local shifted = {}
+					for idx, val in pairs(selected_indices) do
+						if idx > i then
+							shifted[idx - 1] = val
+						else
+							shifted[idx] = val
+						end
+					end
+					selected_indices = shifted
+					break
+				end
+			end
+			update_value_label()
+			refresh_options(build_pairs(multi_config.Options, search_box.Text))
+			update_dropdown_size()
+		end,
+		Clear = function(self)
+			selected_indices = {}
+			update_value_label()
+			refresh_options(build_pairs(multi_config.Options, search_box.Text))
+			update_dropdown_size()
+		end,
+		Refresh = function(self, options)
+			selected_indices = {}
+			multi_config.Options = options
+			refresh_options(build_pairs(options, search_box.Text))
+			update_dropdown_size()
+		end
+	}
+end
 
                 -- Color Wheel
                 function Section:AddColorWheel(sectionConfig)
