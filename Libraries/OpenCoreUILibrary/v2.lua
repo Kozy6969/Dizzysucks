@@ -1447,6 +1447,7 @@ function Section:AddMultiDropdown(multi_config)
 	multi_config.MinSelected = multi_config.MinSelected or 1
 	multi_config.Flag = multi_config.Flag or nil
 	multi_config.Callback = multi_config.Callback or function() end
+	multi_config.WatchInstance = multi_config.WatchInstance or nil
 
 	local theme = OpenCore.Themes[OpenCore.CurrentTheme] or {}
 	theme.Primary  = theme.Primary  or Color3.fromRGB(0, 170, 255)
@@ -1469,6 +1470,7 @@ function Section:AddMultiDropdown(multi_config)
 		end
 	end
 	local opened = false
+	local watch_connections = {}
 
 	local drop_frame = Instance.new("Frame")
 	drop_frame.BackgroundColor3 = theme.Surface
@@ -1530,7 +1532,7 @@ function Section:AddMultiDropdown(multi_config)
 
 	local function update_value_label()
 		local names = {}
-		for i, _ in pairs(selected_indices) do
+		for i in pairs(selected_indices) do
 			table.insert(names, multi_config.Options[i])
 		end
 		value_label.Text = #names > 0 and table.concat(names, ", ") or "None"
@@ -1549,7 +1551,7 @@ function Section:AddMultiDropdown(multi_config)
 
 	local function get_selected_names()
 		local names = {}
-		for i, _ in pairs(selected_indices) do
+		for i in pairs(selected_indices) do
 			table.insert(names, multi_config.Options[i])
 		end
 		return names
@@ -1561,59 +1563,58 @@ function Section:AddMultiDropdown(multi_config)
 		if not opened then return end
 		Tween(drop_frame, {Size = UDim2.new(1, 0, 0, 36 + options_list.AbsoluteContentSize.Y)}, 0.2)
 	end
+local function add_option_button(real_index, option_name, order)
+    local option = Instance.new("TextButton")
+    option.BackgroundColor3 = theme.Card
+    option.BorderSizePixel = 0
+    option.Size = UDim2.new(1, 0, 0, 30)
+    option.Font = GetFont(Window.Font, "Regular")
+    option.Text = "  " .. option_name
+    option.TextColor3 = theme.SubText
+    option.TextSize = 12
+    option.TextXAlignment = Enum.TextXAlignment.Left
+    option.LayoutOrder = order + 3
+    option.Parent = options_container
 
+    local circle = Instance.new("Frame")
+    circle.BackgroundColor3 = theme.Success
+    circle.BorderSizePixel = 0
+    circle.AnchorPoint = Vector2.new(1, 0.5)
+    circle.Position = UDim2.new(1, -12, 0.5, 0)
+    circle.Size = UDim2.new(0, 8, 0, 8)
+    circle.BackgroundTransparency = is_selected_index(real_index) and 0 or 1
+    circle.Parent = option
+    AddCorner(circle, 4)
+
+    option.MouseButton1Click:Connect(function()
+        if is_selected_index(real_index) then
+            if selected_count() > multi_config.MinSelected then
+                selected_indices[real_index] = nil
+                Tween(circle, {BackgroundTransparency = 1}, 0.2)
+            end
+        else
+            if not multi_config.MaxSelected or selected_count() < multi_config.MaxSelected then
+                selected_indices[real_index] = true
+                Tween(circle, {BackgroundTransparency = 0}, 0.2)
+            end
+        end
+        update_value_label()
+    end)
+
+    option_buttons[real_index] = option
+end
 	local function refresh_options(filtered_pairs)
-		for _, btn in pairs(option_buttons) do
-			if btn and btn.Parent then
-				btn:Destroy()
-			end
-		end
-		option_buttons = {}
+    for _, btn in pairs(option_buttons) do
+        if btn and btn.Parent then
+            btn:Destroy()
+        end
+    end
+    option_buttons = {}
 
-		for order, pair in ipairs(filtered_pairs) do
-			local real_index = pair.index
-			local option_name = pair.name
-
-			local option = Instance.new("TextButton")
-			option.BackgroundColor3 = theme.Card
-			option.BorderSizePixel = 0
-			option.Size = UDim2.new(1, 0, 0, 30)
-			option.Font = GetFont(Window.Font, "Regular")
-			option.Text = "  " .. option_name
-			option.TextColor3 = theme.SubText
-			option.TextSize = 12
-			option.TextXAlignment = Enum.TextXAlignment.Left
-			option.LayoutOrder = order + 3  
-			option.Parent = options_container
-
-			local circle = Instance.new("Frame")
-			circle.BackgroundColor3 = theme.Success
-			circle.BorderSizePixel = 0
-			circle.AnchorPoint = Vector2.new(1, 0.5)
-			circle.Position = UDim2.new(1, -12, 0.5, 0)
-			circle.Size = UDim2.new(0, 8, 0, 8)
-			circle.BackgroundTransparency = is_selected_index(real_index) and 0 or 1
-			circle.Parent = option
-			AddCorner(circle, 4)
-
-			option.MouseButton1Click:Connect(function()
-				if is_selected_index(real_index) then
-					if selected_count() > multi_config.MinSelected then
-						selected_indices[real_index] = nil
-						Tween(circle, {BackgroundTransparency = 1}, 0.2)
-					end
-				else
-					if not multi_config.MaxSelected or selected_count() < multi_config.MaxSelected then
-						selected_indices[real_index] = true
-						Tween(circle, {BackgroundTransparency = 0}, 0.2)
-					end
-				end
-				update_value_label()
-			end)
-
-			option_buttons[real_index] = option
-		end
-	end
+    for order, pair in ipairs(filtered_pairs) do
+        add_option_button(pair.index, pair.name, order)
+    end
+end
 
 	local function build_pairs(options, filter_text)
 		local result = {}
@@ -1626,6 +1627,93 @@ function Section:AddMultiDropdown(multi_config)
 		return result
 	end
 
+local sync_pending = false
+
+local function sync_from_instance(instance)
+    if sync_pending then return end
+    sync_pending = true
+
+    task.defer(function()
+        local new_options = {}
+        for _, obj in ipairs(instance:GetDescendants()) do
+            table.insert(new_options, obj:GetFullName())
+        end
+
+        local new_selected = {}
+        for idx in pairs(selected_indices) do
+            local old_name = multi_config.Options[idx]
+            for i, new_name in ipairs(new_options) do
+                if new_name == old_name then
+                    new_selected[i] = true
+                    break
+                end
+            end
+        end
+
+        multi_config.Options = new_options
+        selected_indices = new_selected
+        update_value_label()
+        refresh_options(build_pairs(multi_config.Options, search_box and search_box.Text or ""))
+        update_dropdown_size()
+
+        sync_pending = false
+    end)
+end
+
+local function setup_watch(instance)
+    for _, conn in ipairs(watch_connections) do
+        conn:Disconnect()
+    end
+    watch_connections = {}
+    if not instance then return end
+
+    sync_from_instance(instance)
+
+    table.insert(watch_connections, instance.DescendantAdded:Connect(function(obj)
+        local full_name = obj:GetFullName()
+        local new_index = #multi_config.Options + 1
+        table.insert(multi_config.Options, full_name)
+        add_option_button(new_index, full_name, new_index)
+        update_dropdown_size()
+    end))
+
+    table.insert(watch_connections, instance.DescendantRemoving:Connect(function(obj)
+        local full_name = obj:GetFullName()
+        for i, v in ipairs(multi_config.Options) do
+            if v == full_name then
+                if option_buttons[i] and option_buttons[i].Parent then
+                    option_buttons[i]:Destroy()
+                    option_buttons[i] = nil
+                end
+                selected_indices[i] = nil
+                table.remove(multi_config.Options, i)
+                local shifted_buttons = {}
+                local shifted_selected = {}
+                for idx, val in pairs(selected_indices) do
+                    if idx > i then
+                        shifted_selected[idx - 1] = val
+                    else
+                        shifted_selected[idx] = val
+                    end
+                end
+                for idx, btn in pairs(option_buttons) do
+                    if idx > i then
+                        shifted_buttons[idx - 1] = btn
+                        btn.LayoutOrder = (idx - 1) + 3
+                    else
+                        shifted_buttons[idx] = btn
+                    end
+                end
+                option_buttons = shifted_buttons
+                selected_indices = shifted_selected
+                update_value_label()
+                update_dropdown_size()
+                break
+            end
+        end
+    end))
+end
+
 	local search_box = Instance.new("TextBox")
 	search_box.BackgroundColor3 = theme.Surface
 	search_box.BorderSizePixel = 0
@@ -1633,7 +1721,7 @@ function Section:AddMultiDropdown(multi_config)
 	search_box.Position = UDim2.new(0, 2, 0, 0)
 	search_box.PlaceholderText = "Search..."
 	search_box.Font = GetFont(Window.Font, "Regular")
-	search_box.TextSize = 14
+	search_box.TextSize = 12
 	search_box.TextColor3 = theme.Text
 	search_box.TextXAlignment = Enum.TextXAlignment.Left
 	search_box.ClearTextOnFocus = false
@@ -1643,15 +1731,14 @@ function Section:AddMultiDropdown(multi_config)
 	AddCorner(search_box, 4)
 
 	local confirm_button = Instance.new("TextButton")
-	confirm_button.BackgroundColor3 = Color3.new(0,1,0)
+	confirm_button.BackgroundColor3 = theme.Primary
 	confirm_button.BorderSizePixel = 0
 	confirm_button.Size = UDim2.new(1, 0, 0, 30)
 	confirm_button.Font = GetFont(Window.Font, "Medium")
 	confirm_button.Text = "Confirm"
 	confirm_button.TextColor3 = Color3.new(1, 1, 1)
 	confirm_button.TextSize = 13
-	confirm_button.TextScaled = true
-	confirm_button.LayoutOrder = 2  -- below search
+	confirm_button.LayoutOrder = 2
 	confirm_button.Parent = options_container
 	AddCorner(confirm_button, 4)
 
@@ -1663,8 +1750,7 @@ function Section:AddMultiDropdown(multi_config)
 	clear_button.Text = "Clear"
 	clear_button.TextColor3 = Color3.new(1, 1, 1)
 	clear_button.TextSize = 13
-	clear_button.TextScaled = true
-	clear_button.LayoutOrder = 3  -- below confirm
+	clear_button.LayoutOrder = 3
 	clear_button.Parent = options_container
 	AddCorner(clear_button, 4)
 
@@ -1680,6 +1766,10 @@ function Section:AddMultiDropdown(multi_config)
 	refresh_options(build_pairs(multi_config.Options))
 
 	task.wait(0.05)
+
+	if multi_config.WatchInstance then
+		setup_watch(multi_config.WatchInstance)
+	end
 
 	search_box:GetPropertyChangedSignal("Text"):Connect(function()
 		refresh_options(build_pairs(multi_config.Options, search_box.Text))
@@ -1785,6 +1875,15 @@ function Section:AddMultiDropdown(multi_config)
 			multi_config.Options = options
 			refresh_options(build_pairs(options, search_box.Text))
 			update_dropdown_size()
+		end,
+		SetWatch = function(self, instance)
+			setup_watch(instance)
+		end,
+		StopWatch = function(self)
+			for _, conn in ipairs(watch_connections) do
+				conn:Disconnect()
+			end
+			watch_connections = {}
 		end
 	}
 end
