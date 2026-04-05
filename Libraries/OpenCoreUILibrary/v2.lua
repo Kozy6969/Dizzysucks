@@ -1006,7 +1006,11 @@ function OpenCore:CreateWindow(config)
 						wait(0.08)
 						Tween(btn, {Size = UDim2.new(1, 0, 0, 35)}, 0.08)
 						task.spawn(function()
-							pcall(btnConfig.Callback)
+							local success, err = pcall(btnConfig.Callback)
+
+					if not success then
+    		warn("Button failed with the error:", err)
+		end
 						end)
 					end)
 				end
