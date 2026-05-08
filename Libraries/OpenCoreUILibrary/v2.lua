@@ -2513,7 +2513,8 @@ end
 							OpenCore.Flags[inputConfig.Flag] = textBox.Text
 						end
 						task.spawn(function()
-							pcall(inputConfig.Callback, textBox.Text)
+							local success, error = pcall(inputConfig.Callback, textBox.Text)
+										if not success then print(error) end
 						end)
 							repeat
 								textBox.Text = "" wait() until textBox.Text == ""
